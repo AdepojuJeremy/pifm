@@ -50,12 +50,14 @@ def fasta_records(path):
             yield acc, "".join(parts).upper()
 
 
-def load_sequences(paths, min_length, max_length):
+def load_sequences(paths, min_length, max_length, wanted=None):
     sequences, ambiguous = {}, set()
     # Do not silently strip isoform suffixes or resolve accessions to different
     # full-length proteins. Conflicting sequence records are excluded.
     for path in paths:
         for acc, seq in fasta_records(path):
+            if wanted is not None and acc not in wanted:
+                continue
             if acc in ambiguous:
                 continue
             if acc in sequences and sequences[acc] != seq:
@@ -92,7 +94,19 @@ def prepare(args):
         raise ValueError("--out must end in .csv")
     if output.exists() or audit.exists():
         raise FileExistsError("Output or audit already exists; use a new filename.")
-    sequences, n_ambiguous = load_sequences(args.fasta, args.min_length, args.max_length)
+    # First pass limits sequence RAM to accessions actually in the metadata.
+    wanted = set()
+    with open_text(args.metadata) as handle:
+        reader = csv.DictReader(handle)
+        missing = REQUIRED - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"Missing AFDB columns: {sorted(missing)}")
+        for row in reader:
+            if args.taxid and (row['tax_id_1'] != args.taxid or row['tax_id_2'] != args.taxid):
+                continue
+            wanted.update((row['uniprot_ac_1'].strip(), row['uniprot_ac_2'].strip()))
+    wanted.discard('')
+    sequences, n_ambiguous = load_sequences(args.fasta, args.min_length, args.max_length, wanted)
     if not sequences:
         raise ValueError("No usable FASTA records.")
     counts = Counter()
@@ -186,6 +200,8 @@ def prepare(args):
                            "max_per_class": args.max_per_class,
                            "duplicate_rule": "unanimous threshold across valid scores"},
                 "counts": dict(counts), "usable_accessions": len(sequences),
+                "requested_accessions": len(wanted),
+                "unresolved_or_filtered_accessions": len(wanted - sequences.keys()),
                 "ambiguous_fasta_accessions": n_ambiguous,
                 "limitations": ["Low ipTM does not establish non-interaction.",
                     "Accession-matched FASTA must correspond to modeled sequences.",
@@ -208,9 +224,9 @@ def main():
     p.add_argument("--taxid", help="Require both chains to have this taxonomy ID.")
     p.add_argument("--positive-min", type=float, default=0.8)
     p.add_argument("--negative-max", type=float, default=0.4)
-    p.add_argument("--min-length", type=int, default=30)
-    p.add_argument("--max-length", type=int, default=2048)
-    p.add_argument("--max-per-class", type=int, default=10000, help="0 disables cap.")
+    p.add_argument("--min-length", type=int, default=15)
+    p.add_argument("--max-length", type=int, default=1500)
+    p.add_argument("--max-per-class", type=int, default=0, help="0 disables cap (full release).")
     p.add_argument("--seed", type=int, default=1)
     prepare(p.parse_args())
 
