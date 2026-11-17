@@ -1,0 +1,34 @@
+name: Build full AFDB weak-label dataset
+on:
+  push:
+    branches:
+      - research/afdb-pseudolabels
+    paths:
+      - .github/workflows/afdb-full-release.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: afdb-full-release-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run full release build (no sample cap)
+        run: bash scripts/build_afdb_full_release.sh
+      - name: Check release integrity
+        run: |
+          cd data/raw/afdb/full_release
+          test -f COMPLETE
+          sha256sum -c SHA256SUMS
+      - name: Store complete dataset for review before publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: afdb-heterodimers-full
+          path: data/raw/afdb/full_release/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
