@@ -29,10 +29,14 @@ On a network-enabled machine with adequate disk and RAM, run from the
 repository root:
 
     git switch research/afdb-pseudolabels
-    bash scripts/build_afdb_full_release.sh /path/to/release-matched-sprot.fasta.gz /path/to/release-matched-trembl.fasta.gz
+    bash scripts/build_afdb_full_release.sh
 
-Paths are examples; the input files are not bundled with the repository.
-Alternatively use any collection of verified release-matched FASTA files.
+The no-argument build attempts to discover and stream the official UniProt
+2025_04 archives, retaining only the accessions in AFDB metadata. This may
+require substantial network traffic. Archive layout and accessibility have
+not yet been validated in a live run; discovery fails explicitly if it
+cannot identify the correct archives. Alternatively pass one or more
+verified release-matched local FASTA files as arguments.
 The builder automatically retrieves the complete metadata CSV, runs the
 offline tests, processes the input without a row cap, and packages the
 result. It does not silently fetch current UniProt sequences.
@@ -42,6 +46,8 @@ Output: data/raw/afdb/full_release/
   accession identifiers, representative model ID and ipTM ranges.
 - afdb_full.audit.json: filtering and class counts, accession coverage.
 - manifest.json: shard inventory, exact row totals and schema.
+- sequence-source.json and unresolved-accessions.txt: archive provenance and
+  unmatched accessions when automatic sequence resolution was used.
 - SHA256SUMS, input-checksums.sha256, source-commit.txt, DATASET_CARD.md.
 - COMPLETE: written only after successful packaging.
 
