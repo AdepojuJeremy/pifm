@@ -5,11 +5,6 @@ cd "$(dirname "$0")/.."
 raw=data/raw/afdb
 dist="$raw/full_release"
 mkdir -p "$raw" "$dist"
-if [[ $# -eq 0 ]]; then
-  echo "Usage: $0 RELEASE_MATCHED_FASTA [RELEASE_MATCHED_FASTA ...]" >&2
-  echo "Provide UniProt 2025_04 FASTA files covering all metadata accessions." >&2
-  exit 2
-fi
 if [[ -e "$dist/COMPLETE" || -e "$raw/afdb_full.csv" || -e "$raw/afdb_full.audit.json" ]]; then
   echo "An existing build is present; move it before rebuilding." >&2
   exit 2
@@ -19,6 +14,15 @@ url=https://ftp.ebi.ac.uk/pub/databases/alphafold/collaborations/nvda/heterodime
 if [[ ! -s "$metadata" ]]; then
   curl --fail --location --retry 5 --continue-at - "$url" -o "$metadata.part"
   mv "$metadata.part" "$metadata"
+fi
+if [[ $# -eq 0 ]]; then
+  matched="$raw/uniprot_2025_04_matched.fasta.gz"
+  if [[ ! -s "$matched" ]]; then
+    python scripts/fetch_afdb_release_sequences.py --metadata "$metadata" --out "$matched"
+  fi
+  set -- "$matched"
+  cp "$raw/uniprot_2025_04_matched.fasta.source.json" "$dist/sequence-source.json"
+  cp "$raw/uniprot_2025_04_matched.fasta.missing.txt" "$dist/unresolved-accessions.txt"
 fi
 args=()
 for fasta in "$@"; do
